@@ -273,6 +273,7 @@ class boss_sindragosa : public CreatureScript
                 }*/
 
                 //BossAI::EnterCombat(victim);
+				instance->SetBossState(DATA_SINDRAGOSA, IN_PROGRESS);
 				me->setActive(true);
                 DoZoneInCombat();
                 DoCast(me, SPELL_FROST_AURA);
@@ -533,12 +534,6 @@ class boss_sindragosa : public CreatureScript
                             events.ScheduleEvent(EVENT_FROST_BOMB, urand(6000, 8000));
                             break;
                         }
-						case EVENT_ICE_TOMB_CUSTOM:
-						{
-							ClearMysticBuffet();
-							events.ScheduleEvent(EVENT_ICE_TOMB_CUSTOM, 1000);
-							break;
-						}
                         case EVENT_LAND:
                         {
                             events.CancelEvent(EVENT_FROST_BOMB);
@@ -560,7 +555,6 @@ class boss_sindragosa : public CreatureScript
                                 Talk(SAY_PHASE_2);
                                 events.ScheduleEvent(EVENT_ICE_TOMB, urand(7000, 10000));
                                 events.RescheduleEvent(EVENT_ICY_GRIP, urand(35000, 40000));
-								events.ScheduleEvent(EVENT_ICE_TOMB_CUSTOM, 1000);
                                 DoCast(me, SPELL_MYSTIC_BUFFET, true);
                             }
                             else
@@ -580,18 +574,6 @@ class boss_sindragosa : public CreatureScript
             bool _isInAirPhase;
             bool _isThirdPhase;
             bool _summoned;
-		public:
-			void ClearMysticBuffet() const
-			{   
-				Player* player;
-				Map::PlayerList const& players = me->GetMap()->GetPlayers();
-                if (!players.isEmpty())
-                    for (Map::PlayerList::const_iterator itr = players.begin(); itr != players.end(); ++itr)
-                        if (player = itr->GetSource())
-							if(Unit* tombtarget = player->FindNearestCreature(NPC_FROST_BOMB, 50.0f, true))
-								if (player->GetDistance2d(tombtarget->GetPositionX(),tombtarget->GetPositionY()) < 10.0f)
-									player->RemoveAura(70127);
-			}
         };
 
         CreatureAI* GetAI(Creature* creature) const OVERRIDE
@@ -650,6 +632,25 @@ class npc_ice_tomb : public CreatureScript
             {
                 if (!_trappedPlayerGUID)
                     return;
+
+				//FIX: Check if Sindra is alive, if not, despawn.
+
+				if (InstanceMap* instance = me->GetMap()->ToInstanceMap())
+				{
+					uint64 id = instance->GetInstanceScript()->GetData64(DATA_SINDRAGOSA);
+
+					if (Creature* sindra = Unit::GetCreature(*me, id))
+					{
+						if (!sindra->IsAlive())
+						{
+							JustDied(me);
+							me->DespawnOrUnsummon();
+						}
+					}
+
+				}
+
+				//FIX END
 
                 if (_existenceCheckTimer <= diff)
                 {
